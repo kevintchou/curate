@@ -25,7 +25,7 @@ struct CurateApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            SwipeableContainerView()
         }
         .modelContainer(sharedModelContainer)
     }
