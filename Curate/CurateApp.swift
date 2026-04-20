@@ -10,9 +10,13 @@ import SwiftData
 
 @main
 struct CurateApp: App {
+    @StateObject private var authManager = AuthManager()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
+            Station.self,
+            Feedback.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +29,9 @@ struct CurateApp: App {
 
     var body: some Scene {
         WindowGroup {
-            SwipeableContainerView()
+            CurateView()
+                .withLLMServiceProvider()
+                .environmentObject(authManager)
         }
         .modelContainer(sharedModelContainer)
     }

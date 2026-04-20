@@ -1,0 +1,17 @@
+{
+  "relaxed": ["chill", "calm", "peaceful", "mellow", "soothing", "laid back", "easy", "relax", "relaxing", "tranquil", "serene"],
+  "energetic": ["upbeat", "hype", "pump", "high energy", "intense", "powerful", "energetic", "energy", "adrenaline", "dynamic"],
+  "melancholic": ["sad", "emotional", "heartbreak", "moody", "somber", "melancholy", "tearful", "bittersweet", "longing", "wistful"],
+  "uplifting": ["happy", "joyful", "positive", "feel good", "optimistic", "bright", "uplift", "uplifting", "cheerful", "sunshine"],
+  "focused": ["study", "concentration", "work", "productive", "ambient", "minimal", "focus", "focusing", "deep work", "brain"],
+  "party": ["dance", "club", "turnt", "lit", "celebration", "fun", "party", "rave", "festival", "bangers"],
+  "romantic": ["love", "sensual", "intimate", "date night", "smooth", "romantic", "passion", "seductive", "tender"],
+  "nostalgic": ["throwback", "retro", "classic", "old school", "memories", "90s", "80s", "70s", "nostalgia", "vintage"],
+  "chill": ["chill", "vibes", "lofi", "lo-fi", "easy listening", "background", "soft", "gentle", "cozy"],
+  "aggressive": ["aggressive", "hard", "heavy", "rage", "angry", "intense", "brutal", "fierce"],
+  "dreamy": ["dreamy", "ethereal", "atmospheric", "spacey", "floating", "hazy", "surreal", "otherworldly"],
+  "intense": ["intense", "epic", "dramatic", "cinematic", "powerful", "climactic", "building"],
+  "peaceful": ["peaceful", "serene", "tranquil", "quiet", "gentle", "zen", "meditative", "calming"],
+  "groovy": ["groovy", "funky", "groove", "bass", "rhythm", "bouncy", "swagger", "smooth"],
+  "dark": ["dark", "moody", "brooding", "noir", "gothic", "sinister", "mysterious", "shadowy"]
+}

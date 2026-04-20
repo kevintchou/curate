@@ -1,0 +1,17 @@
+{
+  "Hip-Hop": ["hip hop", "hiphop", "rap", "trap", "boom bap", "hip-hop", "rapper", "mc"],
+  "R&B": ["rnb", "r and b", "rhythm and blues", "soul", "r&b", "neo soul", "contemporary r&b"],
+  "Electronic": ["edm", "house", "techno", "trance", "dubstep", "electronic", "electronica", "synth"],
+  "Rock": ["alternative rock", "indie rock", "hard rock", "rock", "guitar", "band"],
+  "Pop": ["top 40", "mainstream", "chart", "pop", "radio hits", "popular"],
+  "Jazz": ["smooth jazz", "bebop", "jazz fusion", "jazz", "swing", "big band"],
+  "Classical": ["orchestra", "symphony", "chamber music", "classical", "orchestral", "piano"],
+  "Country": ["country", "americana", "bluegrass", "nashville", "folk country"],
+  "Metal": ["metal", "heavy metal", "death metal", "metalcore", "thrash", "hardcore"],
+  "Folk": ["folk", "acoustic", "singer-songwriter", "folksy", "unplugged"],
+  "Blues": ["blues", "delta blues", "chicago blues", "bluesy", "soul blues"],
+  "Reggae": ["reggae", "dancehall", "dub", "ska", "jamaican"],
+  "Latin": ["latin", "reggaeton", "salsa", "bachata", "latino", "spanish", "tropical"],
+  "Indie": ["indie", "independent", "underground", "lo-fi", "bedroom"],
+  "Alternative": ["alternative", "alt", "indie rock", "alt rock", "modern rock"]
+}
