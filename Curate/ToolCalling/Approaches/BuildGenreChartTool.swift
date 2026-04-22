@@ -23,7 +23,7 @@ final class BuildGenreChartTool: MusicTool {
         properties: [
             "genre": .string("Genre name (e.g., 'Alternative', 'Jazz', 'Hip-Hop')"),
             "decade": .integer("Optional decade filter (e.g., 1990, 2000, 2010)"),
-            "track_count": .integer("Target number of tracks to return (default 25)")
+            "track_count": .integer("Target number of tracks to return (default 50)")
         ],
         required: ["genre"]
     )
@@ -32,25 +32,35 @@ final class BuildGenreChartTool: MusicTool {
         let args = try ToolArguments(from: arguments)
         let genre = try args.requireString("genre")
         let decade = args.optionalInt("decade", default: 0)
-        let trackCount = args.optionalInt("track_count", default: 25)
+        let trackCount = args.optionalInt("track_count", default: 50)
 
-        var allTracks: [GenreChartTrack] = []
-        var seenIds: Set<String> = []
+        var seenISRCs: Set<String> = []
+        var seenTitleArtist: Set<String> = []
 
-        // Step 1: Search for genre charts via top songs
+        /// Deduplication helper — returns true if the track is new and registers it.
+        func isDuplicate(id: String, isrc: String?, title: String, artistName: String) -> Bool {
+            let isrcVal = isrc ?? ""
+            if !isrcVal.isEmpty && seenISRCs.contains(isrcVal) { return true }
+            let key = "\(title.lowercased().filter { !$0.isWhitespace })||\(artistName.lowercased().filter { !$0.isWhitespace })"
+            if seenTitleArtist.contains(key) { return true }
+            if !isrcVal.isEmpty { seenISRCs.insert(isrcVal) }
+            seenTitleArtist.insert(key)
+            return false
+        }
+
+        // Step 1: Fetch genre charts — popularity-ranked, used as primary source.
+        var chartTracks: [GenreChartTrack] = []
         var chartRequest = MusicCatalogChartsRequest(kinds: [.mostPlayed], types: [Song.self])
-        chartRequest.limit = 50
+        chartRequest.limit = 100
         let chartResponse = try await chartRequest.response()
 
         for chart in chartResponse.songCharts {
             for song in chart.items {
-                guard !seenIds.contains(song.id.rawValue) else { continue }
-                // Genre filter
                 let matchesGenre = song.genreNames.contains { $0.localizedCaseInsensitiveContains(genre) }
                 guard matchesGenre else { continue }
-
-                seenIds.insert(song.id.rawValue)
-                allTracks.append(GenreChartTrack(
+                guard !isDuplicate(id: song.id.rawValue, isrc: song.isrc,
+                                   title: song.title, artistName: song.artistName) else { continue }
+                chartTracks.append(GenreChartTrack(
                     id: song.id.rawValue,
                     title: song.title,
                     artistName: song.artistName,
@@ -63,8 +73,14 @@ final class BuildGenreChartTool: MusicTool {
             }
         }
 
-        // Step 2: Supplement with genre playlist search
+        print("🎵 GenreChart: \(chartTracks.count) chart tracks matched genre '\(genre)'")
+
+        // Step 2: Supplement with genre playlist search — stored per bucket for round-robin.
+        // Playlists fill gaps when the chart alone doesn't reach trackCount
+        // (common for niche genres or after decade filtering).
+        var playlistBuckets: [[GenreChartTrack]] = []
         let playlistQueries = [genre, "\(genre) essentials", "\(genre) hits"]
+
         for query in playlistQueries {
             var searchRequest = MusicCatalogSearchRequest(term: query, types: [Playlist.self])
             searchRequest.limit = 3
@@ -76,10 +92,11 @@ final class BuildGenreChartTool: MusicTool {
 
                 if let plResponse = try? await plRequest.response(),
                    let tracks = plResponse.items.first?.tracks {
-                    for track in tracks.prefix(20) {
-                        guard !seenIds.contains(track.id.rawValue) else { continue }
-                        seenIds.insert(track.id.rawValue)
-                        allTracks.append(GenreChartTrack(
+                    var bucketTracks: [GenreChartTrack] = []
+                    for track in tracks.prefix(100) {
+                        guard !isDuplicate(id: track.id.rawValue, isrc: track.isrc,
+                                           title: track.title, artistName: track.artistName) else { continue }
+                        bucketTracks.append(GenreChartTrack(
                             id: track.id.rawValue,
                             title: track.title,
                             artistName: track.artistName,
@@ -90,40 +107,74 @@ final class BuildGenreChartTool: MusicTool {
                             source: "playlist:\(playlist.name)"
                         ))
                     }
+                    if !bucketTracks.isEmpty {
+                        playlistBuckets.append(bucketTracks)
+                    }
                 }
                 try await Task.sleep(nanoseconds: 100_000_000)
             }
             try await Task.sleep(nanoseconds: 100_000_000)
         }
 
-        // Step 3: Decade filter
-        if decade > 0 {
-            let decadeStart = decade
+        // Step 3: Decade filter — applied to both chart and playlist tracks.
+        func applyDecadeFilter(_ tracks: [GenreChartTrack]) -> [GenreChartTrack] {
+            guard decade > 0 else { return tracks }
             let decadeEnd = decade + 9
-            allTracks = allTracks.filter { track in
+            return tracks.filter { track in
                 guard let dateStr = track.releaseDate,
-                      let year = Int(dateStr.prefix(4)) else {
-                    return true // Keep tracks without date info
-                }
-                return year >= decadeStart && year <= decadeEnd
+                      let year = Int(dateStr.prefix(4)) else { return true }
+                return year >= decade && year <= decadeEnd
             }
         }
 
-        // Step 4: Diversity enforcement
+        let filteredChart = applyDecadeFilter(chartTracks)
+        let filteredBuckets = playlistBuckets.map { applyDecadeFilter($0) }.filter { !$0.isEmpty }
+
+        print("🎵 GenreChart: \(filteredChart.count) chart tracks after decade filter (decade=\(decade > 0 ? "\(decade)" : "none"))")
+        let totalCandidates = filteredChart.count + filteredBuckets.reduce(0) { $0 + $1.count }
+        print("🎵 GenreChart: \(filteredBuckets.count) playlist buckets, \(totalCandidates) total candidates")
+
+        // Step 4: Chart-first selection, then round-robin across playlist buckets for remainder.
+        // Chart tracks are popularity-ranked so their order is preserved.
+        // Playlist buckets fill remaining slots via round-robin, respecting Apple's editorial ordering.
+        //
+        // Commented out: diversity enforcement (artist cap of 2 per artist)
         var selected: [GenreChartTrack] = []
-        var artistCounts: [String: Int] = [:]
-        for track in allTracks {
-            let key = track.artistName.lowercased()
-            if (artistCounts[key] ?? 0) >= 2 { continue }
+
+        for track in filteredChart {
+            guard selected.count < trackCount else { break }
             selected.append(track)
-            artistCounts[key, default: 0] += 1
-            if selected.count >= trackCount { break }
         }
 
+        if selected.count < trackCount && !filteredBuckets.isEmpty {
+            var indices = Array(repeating: 0, count: filteredBuckets.count)
+            var anyProgress = true
+            while selected.count < trackCount && anyProgress {
+                anyProgress = false
+                for i in 0..<filteredBuckets.count {
+                    guard selected.count < trackCount else { break }
+                    guard indices[i] < filteredBuckets[i].count else { continue }
+                    selected.append(filteredBuckets[i][indices[i]])
+                    indices[i] += 1
+                    anyProgress = true
+                }
+            }
+        }
+
+        // var artistCounts: [String: Int] = [:]
+        // for track in allTracks {
+        //     let key = track.artistName.lowercased()
+        //     if (artistCounts[key] ?? 0) >= 2 { continue }
+        //     selected.append(track)
+        //     artistCounts[key, default: 0] += 1
+        //     if selected.count >= trackCount { break }
+        // }
+
+        print("🎵 GenreChart: Selected \(selected.count) tracks (target: \(trackCount))")
         return .encode(GenreChartResult(
             genre: genre,
             decade: decade > 0 ? decade : nil,
-            totalCandidates: allTracks.count,
+            totalCandidates: totalCandidates,
             tracks: selected
         ))
     }
